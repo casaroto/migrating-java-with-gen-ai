@@ -1,109 +1,76 @@
-# ModResorts Demo Application
+# ModResorts — Spring Web MVC
 
-## Overview
-ModResorts (as per the `main` branch) is a IBM WebSphere Application Server web application. It is a simple application that can be used to demonstrate modernization of a IBM WebSphere Application Server to Liberty, as well as Java version upgrade scenarios.
-The Java source code is dependent on APIs that only exist on the IBM WebSphere Application Server and as such, this version of the application will only function correctly when deployed to IBM WebSphere Application Server. In order to successfully deploy to Liberty, code changes need to be made to the application. See [Liberty Versions of ModResorts](#liberty-versions-of-modresorts) below.
+## Visão geral
+Esta é a versão **Spring Web MVC** da aplicação de exemplo ModResorts, **migrada do modelo Java EE baseado em servlets para Spring MVC**, rodando em **Java 17**.
 
+A migração foi concluída: **todos os servlets e filtros legados foram removidos** e cada endpoint passou a ser um **controller Spring** (`@RestController` / `@Controller`). As requisições são tratadas pelo `DispatcherServlet` do Spring, montado sob o caminho `/mvc/*`.
 
-## Building
+A aplicação continua empacotada como **WAR**, rodando em um container de servlets (Tomcat 9 / WebSphere Liberty).
 
-### IBM WebSphere Application Server Dependencies
-The `main` branch version of ModResorts has dependencies on WebSphere Application Server APIs. The `pom.xml` references the associated WAS dependency and to build the application, you will need to have the dependency available in a maven repository. The `was_public.jar` jar and its associated `pom` file can be found in your WebSphere installation. For example, in a typical installation, you might find them at the following location: `/opt/WebSphere/AppServer/dev`.
-You can install to your local maven repository (`$HOME/.m2`) using the following command:
+## O que mudou na migração (Java EE → Spring MVC)
+
+| Aspecto | Original (Java EE / servlets) | Esta versão (Spring MVC) |
+|--------|-------------------------------|---------------------------|
+| Camada HTTP | Servlets `HttpServlet` | Controllers Spring (`@RestController` / `@Controller`) |
+| Roteamento | `@WebServlet` / `web.xml` | `DispatcherServlet` em `/mvc/*` + `@GetMapping` / `@PostMapping` |
+| Filtros | `FirstFilter` / `SecondFilter` (servlet, via `web.xml`) | Comportamento incorporado ao `WelcomeController` |
+| Logout | `LogoutServlet` (`request.logout()` + `sendRedirect`) | `LogoutController` (`return "redirect:/login.jsp"`) |
+| Injeção de dependências | `@Inject` (CDI) | `@Autowired` (Spring) |
+| Framework | Java EE | `spring-webmvc`, `spring-context` |
+| Escape de HTML (upper) | API do WebSphere | `commons-text` (`StringEscapeUtils`) |
+| Namespaces | `javax.servlet.*` | `javax.servlet.*` (mantido) |
+| Empacotamento | WAR | WAR (mantido) |
+
+> **Importante:** a aplicação **não contém mais servlets nem filtros** — toda a camada HTTP é Spring MVC. Ainda é empacotada como **WAR** e implantada em um container de servlets; o `web.xml` agora declara apenas o `DispatcherServlet`. A dependência `was_public.jar` permanece declarada no `pom.xml` (não é mais usada pelo código). Veja [Dependências do WebSphere](#dependências-do-websphere).
+
+> **Observação:** apesar de uma mensagem de exemplo citar "Spring Boot", esta aplicação usa **Spring Web MVC** sobre um container de servlets — **não** é Spring Boot.
+
+## Controllers
+| Controller | Substitui | Caminho (`/mvc/*`) |
+|-----------|-----------|--------------------|
+| `WeatherController` | `WeatherServlet` | `/mvc/weather` |
+| `AvailabilityCheckerController` | `AvailabilityCheckerServlet` | `/mvc/availability` |
+| `UpperController` | `UpperServlet` | `/mvc/upper` |
+| `WelcomeController` | `WelcomeServlet` + `FirstFilter` + `SecondFilter` | `/mvc/welcome` |
+| `LogoutController` | `LogoutServlet` | `/mvc/logout` |
+| `HelloController` | — (endpoint de verificação) | `/mvc/test` |
+
+## Requisitos
+- Java 17
+- Maven 3.9+
+- Container de servlets: Tomcat 9 ou WebSphere Liberty
+- `was_public.jar` instalado no repositório Maven local (ainda declarado no `pom.xml`)
+
+### Dependências do WebSphere
+O `pom.xml` ainda referencia a dependência `was_public`. Para compilar, instale o jar no repositório Maven (encontrado na instalação do WebSphere, ex.: `/opt/WebSphere/AppServer/dev`):
 
 ```
-mvn install:install-file -Dfile=<some location>/was_public.jar -DpomFile=<some location>/was_public-9.0.0.pom
+mvn install:install-file -Dfile=<local>/was_public.jar -DpomFile=<local>/was_public-9.0.0.pom
 ```
 
-For more information please see the [docs](https://www.ibm.com/docs/en/wasdtfe?topic=environment-installing-server-apis-into-maven-repository).
-
-### Building Using Maven
-This is a standard single module maven application and the WAR can be built as follows:
-
+## Build
 ```
 mvn clean package
 ```
 
-
-### Building Using Gradle
-This application can also be built using gradle:
-
+## Executando
+Faça o build do WAR e implante-o em um container de servlets. O script `run.sh` da raiz sobe a aplicação em um Tomcat 9 local:
 ```
-./gradlew clean build
+./run.sh
 ```
+Alternativamente, use o `Containerfile` para construir uma imagem WebSphere Liberty e rodar em contêiner.
 
-## Liberty Versions of ModResorts
-Two Liberty versions of the application are maintained on the following branches:
+## Endpoints
 
-- `liberty-java8`
-  This branch shows what the application looks like after it has been modernized to Liberty. Comparing this branch to main, you will notice the following changes:
-  - Code changes in some source files (to remove use of WAS APIs)
-  - Addition of the Liberty config file: `src/main/liberty/config/server.xml`. This file is produced by IBM Transformation Advisor and is available in the [migration bundle](#migration-bundle)
-  - A `Containerfile` has also been added to the project root to allow you to build an image and run the application in a container.
-  - The Liberty tools [plugin](https://github.com/OpenLiberty/ci.maven) has been added to the `pom.xml` for convenience of running the application in Liberty. 
+Todos os endpoints são controllers Spring MVC servidos pelo `DispatcherServlet` (prefixo `/mvc/`). Considerando o context root `/resorts`, o caminho completo fica, por exemplo, `/resorts/mvc/weather`.
 
-- `liberty-java21`
-  This branch shows what the application looks like after it has been modernized to Liberty **AND** upgraded to Java 21. Comparing this branch to main, you will notice all the changes described for the `liberty-java8` branch in addition to:
-  - Code changes in some source files (to fix Java upgrade issues)
+| Método | Caminho | Descrição |
+|--------|---------|-----------|
+| GET/POST | `/mvc/weather?selectedCity=<cidade>` | Dados de clima da cidade (`WeatherController`) |
+| GET/POST | `/mvc/availability?date=MM/dd/yyyy` | Disponibilidade para a data (`AvailabilityCheckerController`) |
+| GET | `/mvc/upper?input=<texto>` | Converte o texto para maiúsculas, com escape de HTML (`UpperController`) |
+| GET | `/mvc/welcome?user=<nome>` | Mensagem de boas-vindas (`WelcomeController`) |
+| GET | `/mvc/logout` | Encerra a sessão e redireciona para `login.jsp` (`LogoutController`) |
+| GET | `/mvc/test` | Endpoint de verificação (`HelloController`) |
 
-## Version 2
-Version 2 of ModResorts contains extra migration issues that need to be addressed when modernizing to Liberty and when upgrading Java. Version 2 can be used for a more complete modernization demo.
-
-Version 2 exists in branches that represent the various stages of modernization:
-
-- `main-v2` 
-  This branch captures the application as a traditional WebSphere Application Server application built with and running on Java 8
-
-- `liberty-java8-v2`
-  This branch captures the application after it has been modernized to Liberty, but still built with and running on Java 8
-
-- `liberty-java21-v2`
-  This branch captures the final state of the application after it has been modernized to Liberty, and upgraded to use Java 21.
-
-In order to build and run Version 2 of the application, you need to install the dependencies in the `dependencies` directory to your local maven repository:
-
-```
-mvn install:install-file -Dfile=dependencies/env-config-1.5.jar -DpomFile=dependencies/env-config-1.5.pom
-mvn install:install-file -Dfile=dependencies/env-config-1.6.jar -DpomFile=dependencies/env-config-1.6.pom
-mvn install:install-file -Dfile=dependencies/env-config-1.7.jar -DpomFile=dependencies/env-config-1.7.pom
-```
-
-
-## Deploying the Application to IBM WebSphere Application Server
-There are no special instructions for deploying the application to IBM WebSphere Application Server. There is no configuration required on the application server in order for the application to deploy and function.
-
-It can be deployed using the UI console or using `wsadmin`.
-Please refer to the [documentation](https://www.ibm.com/docs/en/was-nd/9.0.5?topic=applications-how-do-i-deploy) for more details on deploying the application to WebSphere Application Server.
-
-
-
-## Deploying the Application to Liberty
-To deploy the application on Liberty you can do one of the following:
-- Install the Liberty tools IDE plugin (VSCode and Eclipse available)
-- Add the Liberty tools plugin to the build configuration. Note, for convenience, the Liberty tools plugin is already added to the `pom.xml` in the `liberty-` branches. Liberty can be launched in dev mode with the following command:
-```
-mvn liberty:dev
-```
-- Run the Liberty tools directly from the command line:
-```
-mvn io.openliberty.tools:liberty-maven-plugin:3.10.2:dev
-```
-- Build and drop the WAR file into Liberty installation.
-
-For more on Liberty Dev Tools please refer to [Develop with Liberty Tools](https://openliberty.io/docs/latest/develop-liberty-tools.html)
-
-## Building and Running the Application a Liberty Container
-A Containerfile exists in the `liberty-` branches. The Containerfile is produced by IBM Transformation Advisor and is available in the [migration bundle](#migration-bundle). It can be used to build an image and run the application in a container. You can build the image as follows:
-
-```
-docker build -t modresorts:latest -f Containerfile .
-```
-
-You can run the container as follows:
-
-```
-docker run --rm -d -p 9080:9080 modresorts:latest
-```
-
-## Migration Bundle
-The `migration_bundle` directory contains a migration bundle for ModResorts created by [IBM Transformation Advisor](https://www.ibm.com/products/cloud-pak-for-applications/transformation-advisor). It contains an analysis of the application and artifacts that accelerate modernization to Liberty and cloud migration.
+Cidades suportadas: `Paris`, `Las_Vegas`, `San_Francisco`, `Miami`, `Cork`, `Barcelona`.

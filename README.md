@@ -33,3 +33,25 @@ Os projetos ilustram por que migrar aplicações Java legado deixou de ser apena
 Os exemplos também servem de base para mostrar como a inteligência artificial generativa pode acelerar jornadas de modernização, apoiando a análise de código legado, a identificação de dependências, a refatoração, a criação de testes, a documentação, a migração de frameworks, a revisão de segurança e a geração de pipelines automatizados.
 
 Essa jornada pode utilizar tanto ferramentas pagas quanto gratuitas — incluindo IDEs com assistentes de IA, modelos locais, soluções Open Source e plataformas corporativas — permitindo que as empresas escolham o melhor caminho conforme seu nível de maturidade, orçamento e requisitos de governança.
+
+## Itens legados do projeto base (`sample-app-mod`)
+
+O projeto base [`sample-app-mod`](sample-app-mod/) concentra as características de uma aplicação Java legada típica — exatamente os pontos que a jornada de modernização (projetos 2 a 4) busca eliminar ou substituir. A tabela abaixo lista esses itens, por que são considerados legados/problemáticos e para o que costumam ser migrados.
+
+| Item legado | Onde aparece | Por que é um problema | Para onde migrar |
+|-------------|--------------|-----------------------|------------------|
+| **Java 8** | `pom.xml` (`maven.compiler` 1.8) | Fim do suporte público; sem recursos modernos da linguagem e da JVM; riscos de segurança | Java 17+ (LTS) |
+| **Servlets Java EE** (`HttpServlet`, `@WebServlet`, `web.xml`) | `WeatherServlet`, `AvailabilityCheckerServlet`, `UpperServlet`, `WelcomeServlet`, `LogoutServlet` | API verbosa e de baixo nível, acoplada ao container de servlets | Spring MVC ou Jakarta REST (JAX-RS) |
+| **Filtros de servlet** (`javax.servlet.Filter`) | `FirstFilter`, `SecondFilter` | Acoplados ao `web.xml`/container; difíceis de testar isoladamente | Interceptors/filtros do framework moderno |
+| **Namespace `javax.*`** | Todo o código (`javax.servlet`, `javax.inject`) | Anterior ao Jakarta EE 9+; incompatível com runtimes modernos | Namespace `jakarta.*` |
+| **APIs exclusivas do WebSphere** (`com.ibm.websphere.servlet.response.ResponseUtils`, `was_public.jar`) | `UpperServlet`, `pom.xml` | Lock-in de fornecedor; só compila/roda no WebSphere; jar instalado manualmente | Bibliotecas portáveis (ex.: `commons-text`, utilitários próprios) |
+| **EJB 3.2** (`@Singleton`, `@Startup` — via `javaee-api` 7.0 / Java EE 7) | `db/ModResortsCustomerInformation` | Modelo de componentes pesado e legado; exige container EE completo | CDI (`@ApplicationScoped`) |
+| **JNDI** (`InitialContext`) | `WeatherServlet`, `AvailabilityCheckerServlet` | Dependente de configuração do servidor de aplicações | Injeção de configuração/dependências do framework |
+| **JMX `DynamicMBean`** com `ops.json` inválido | `mbean/AppInfo`, `mbean/DMBeanUtils`, `ops.json` | Valor de `impact` inválido (10) quebra a inicialização fora do WebSphere; bug latente | Métricas/observabilidade modernas (ex.: Micrometer) |
+| **Segurança FORM gerida pelo container** | `web.xml` (`login-config`), `login.jsp` | Acoplada ao servidor; já desativada no demo | Segurança do framework / IdP externo (OIDC) |
+| **`TrustManager` que confia em tudo** | `security/FakeX509TrustManager`, `security/SSLUtils` | Desativa a validação de certificados TLS — falha grave de segurança | Validação TLS padrão da JVM |
+| **`SecurityManager`** | `security/Service` | Depreciado e marcado para remoção (JEP 411) | Remover; usar políticas de SO/container |
+| **JDBC manual com `DataSource` via JNDI** | `db/ModResortsCustomerInformation` | Boilerplate de conexão; lookup acoplado ao servidor (já comentado) | Camada de persistência moderna (JPA/Panache) |
+| **`SimpleDateFormat`, `Hashtable`, tipos crus** | `AvailabilityCheckerServlet`, `WeatherServlet` | `SimpleDateFormat` não é thread-safe; coleções/APIs antigas | `java.time` (`DateTimeFormatter`), coleções com genéricos |
+| **API externa descontinuada** (Weather Underground) | `Constants`, `WeatherServlet` | Serviço extinto; chamadas falham (a app cai em dados estáticos) | API de clima ativa ou serviço configurável |
+| **Empacotamento WAR para servidor de aplicações** | `pom.xml` (`<packaging>war</packaging>`) | Exige servidor externo; ciclo de deploy pesado | JAR executável autônomo (cloud-native) |
