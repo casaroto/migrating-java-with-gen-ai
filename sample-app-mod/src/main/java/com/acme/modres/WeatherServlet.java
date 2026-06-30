@@ -75,7 +75,16 @@ public class WeatherServlet extends HttpServlet {
     } catch (InstanceAlreadyExistsException | MBeanRegistrationException | NotCompliantMBeanException e) {
       e.printStackTrace();
     }
-    context = setInitialContextProps();
+    // Only set WebSphere JNDI properties if the classes are available
+    try {
+      Class.forName("com.ibm.websphere.naming.WsnInitialContextFactory");
+      context = setInitialContextProps();
+    } catch (ClassNotFoundException | LinkageError e) {
+      // WebSphere classes not available or not initializable (e.g. outside a
+      // WAS container) - use default JNDI
+      Logger.getLogger(WeatherServlet.class.getName()).log(Level.INFO,
+        "WebSphere JNDI classes not available, using default JNDI");
+    }
   }
 
   @Override
@@ -263,14 +272,24 @@ public class WeatherServlet extends HttpServlet {
 
     Hashtable ht = new Hashtable();
 
-    ht.put("java.naming.factory.initial", "com.ibm.websphere.naming.WsnInitialContextFactory");
-    ht.put("java.naming.provider.url", "corbaloc:iiop:localhost:2809");
+    // Only set WebSphere-specific properties if the classes are available
+    try {
+      ht.put("java.naming.factory.initial", "com.ibm.websphere.naming.WsnInitialContextFactory");
+      ht.put("java.naming.provider.url", "corbaloc:iiop:localhost:2809");
+    } catch (Exception e) {
+      // WebSphere classes not available - use default JNDI
+      // This allows the servlet to work in non-WebSphere environments
+      // Log the exception but don't fail
+      Logger.getLogger(WeatherServlet.class.getName()).log(Level.WARNING,
+        "WebSphere JNDI classes not available, using default JNDI", e);
+    }
 
     InitialContext ctx = null;
     try {
       ctx = new InitialContext(ht);
     } catch (NamingException e) {
-      e.printStackTrace();
+      Logger.getLogger(WeatherServlet.class.getName()).log(Level.WARNING,
+        "Failed to create InitialContext", e);
     }
 
     return ctx;

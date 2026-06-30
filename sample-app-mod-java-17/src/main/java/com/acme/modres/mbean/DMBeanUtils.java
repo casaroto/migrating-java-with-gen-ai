@@ -23,7 +23,7 @@ public final class DMBeanUtils {
         String name = opMetadata.getName();
         String desc = opMetadata.getDescription();
         String type = opMetadata.getType();
-        int impact = opMetadata.getImpact();
+        int impact = normalizeImpact(opMetadata.getImpact());
 
         MBeanOperationInfo opInfo = new MBeanOperationInfo(name, desc, /* signature */ null, type, impact, /*
                                                                                                             * descriptor
@@ -33,5 +33,23 @@ public final class DMBeanUtils {
     }
 
     return ops;
+  }
+
+  /**
+   * MBeanOperationInfo only accepts INFO(0), ACTION(1), ACTION_INFO(2) or
+   * UNKNOWN(3). The legacy ops.json carried out-of-range values (e.g. 10) that
+   * WebSphere tolerated but the standard JDK rejects with
+   * IllegalArgumentException, which broke WeatherServlet initialization.
+   * Clamp anything invalid to UNKNOWN so the MBean still registers.
+   */
+  private static int normalizeImpact(int impact) {
+    if (impact == MBeanOperationInfo.INFO
+        || impact == MBeanOperationInfo.ACTION
+        || impact == MBeanOperationInfo.ACTION_INFO
+        || impact == MBeanOperationInfo.UNKNOWN) {
+      return impact;
+    }
+    logger.log(Level.WARNING, "Invalid MBean operation impact {0}, defaulting to UNKNOWN", impact);
+    return MBeanOperationInfo.UNKNOWN;
   }
 }

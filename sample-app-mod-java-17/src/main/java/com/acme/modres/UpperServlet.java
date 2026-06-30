@@ -9,8 +9,6 @@ import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
-import com.ibm.websphere.servlet.response.ResponseUtils;
-
 @WebServlet("/resorts/upper")
 public class UpperServlet extends HttpServlet {
 
@@ -26,9 +24,30 @@ public class UpperServlet extends HttpServlet {
     }
 
     String newStr = originalStr.toUpperCase();
-    newStr = ResponseUtils.encodeDataString(newStr);
+    // Replaces com.ibm.websphere.servlet.response.ResponseUtils.encodeDataString
+    // (WebSphere-only API) with a portable HTML entity escape.
+    newStr = encodeDataString(newStr);
 
     PrintWriter out = response.getWriter();
     out.print("<br/><b>upper case input " + newStr + "</b>");
+  }
+
+  private static String encodeDataString(String input) {
+    if (input == null) {
+      return "";
+    }
+    StringBuilder sb = new StringBuilder(input.length());
+    for (int i = 0; i < input.length(); i++) {
+      char c = input.charAt(i);
+      switch (c) {
+        case '&' -> sb.append("&amp;");
+        case '<' -> sb.append("&lt;");
+        case '>' -> sb.append("&gt;");
+        case '"' -> sb.append("&quot;");
+        case '\'' -> sb.append("&#39;");
+        default -> sb.append(c);
+      }
+    }
+    return sb.toString();
   }
 }

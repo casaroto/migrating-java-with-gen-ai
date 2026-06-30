@@ -72,3 +72,8 @@ Thumbs.db
 # Environment files
 .env
 .env.local
+.playwright-mcp/page-2026-06-23T17-31-20-559Z.yml
+
+.playwright-mcp/*
+.claude/run.sh
+.claude/run copy.sh
